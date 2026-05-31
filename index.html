@@ -5644,8 +5644,8 @@
       }
       .pwa-card__btn:hover { opacity: 0.88; transform: scale(1.03); }
       .pwa-card__btn:active { transform: scale(0.98); }
-      .pwa-card__btn:disabled {
-        opacity: 0.5; cursor: not-allowed; transform: none;
+      .pwa-card__btn:disabled { /* always clickable */
+        opacity: 1; cursor: pointer;
       }
 
       /* Success */

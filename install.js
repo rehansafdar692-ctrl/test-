@@ -1,127 +1,99 @@
 /**
- * W.H. Academy — PWA Install Handler v2
- * Always shows install buttons on landing page.
- * Hides after installation. No update banner.
+ * W.H. Academy — PWA Install Handler v3
+ * Fixes: buttons always work, proper fallbacks for all cases
  */
 (function () {
   'use strict';
 
-  /* ── Service Worker Registration ─────────────────────── */
+  var ua           = navigator.userAgent || '';
+  var isIOS        = /iphone|ipad|ipod/i.test(ua);
+  var isIPadOS     = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+  var isSafari     = /safari/i.test(ua) && !/chrome|crios|fxios/i.test(ua);
+  var isAndroid    = /android/i.test(ua);
+  var isChrome     = /chrome|chromium/i.test(ua) && !/edge/i.test(ua);
+  var isEdge       = /edg\//i.test(ua);
+  var isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+                     window.navigator.standalone === true;
+
+  var deferredPrompt = null;
+
+  /* ── Service Worker ───────────────────────────────────── */
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () {
       navigator.serviceWorker.register('./service-worker.js', { scope: './' })
-        .then(function (reg) {
-          console.log('[PWA] SW registered:', reg.scope);
-        })
-        .catch(function (err) {
-          console.warn('[PWA] SW failed:', err);
-        });
+        .then(function (r) { console.log('[SW] Registered:', r.scope); })
+        .catch(function (e) { console.warn('[SW] Failed:', e); });
     });
   }
 
-  /* ── Device Detection ─────────────────────────────────── */
-  var ua           = navigator.userAgent || '';
-  var isIOS        = /iphone|ipad|ipod/i.test(ua);
-  var isSafari     = /^((?!chrome|android).)*safari/i.test(ua);
-  var isAndroid    = /android/i.test(ua);
-  var isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
-                     (window.navigator.standalone === true);
-
-  /* ── Public API ───────────────────────────────────────── */
-  window.WHAcademyPWA = {
-    _deferredPrompt: null,
-
-    triggerInstall: function (type) {
-      if (type === 'ios') {
-        showIOSModal();
-      } else if (this._deferredPrompt) {
-        var p = this._deferredPrompt;
-        p.prompt();
-        p.userChoice.then(function (choice) {
-          if (choice.outcome === 'accepted') {
-            hideSection();
-            showSuccess();
-          }
-          window.WHAcademyPWA._deferredPrompt = null;
-        });
-      } else {
-        // Prompt not available yet — show a friendly message
-        var btn = document.querySelector('[data-pwa-install="android"], [data-pwa-install="desktop"]');
-        if (btn) {
-          btn.textContent = 'Use Chrome to install';
-          btn.disabled = true;
-          setTimeout(function () {
-            btn.textContent = btn.getAttribute('data-original-text') || 'Install App';
-            btn.disabled = false;
-          }, 3000);
-        }
-      }
-    },
-
-    dismissIOSModal: function () {
-      var m = document.getElementById('pwa-ios-modal');
-      if (m) m.classList.remove('pwa-modal--visible');
-    }
-  };
-
-  /* ── beforeinstallprompt (Android + Desktop) ──────────── */
+  /* ── Capture install prompt ───────────────────────────── */
   window.addEventListener('beforeinstallprompt', function (e) {
     e.preventDefault();
-    window.WHAcademyPWA._deferredPrompt = e;
-    // Enable the button now that prompt is ready
+    deferredPrompt = e;
+    console.log('[PWA] Install prompt captured');
+    // Visually mark the button as ready
     var btns = document.querySelectorAll('[data-pwa-install="android"], [data-pwa-install="desktop"]');
-    btns.forEach(function (b) { b.disabled = false; });
+    btns.forEach(function (b) {
+      b.classList.add('pwa-btn--ready');
+      b.disabled = false;
+    });
   });
 
   window.addEventListener('appinstalled', function () {
-    window.WHAcademyPWA._deferredPrompt = null;
-    hideSection();
-    showSuccess();
-  });
-
-  /* ── DOM Ready: Show the correct cards ────────────────── */
-  function init() {
-    var section = document.getElementById('pwa-install-section');
-    if (!section) return;
-
-    // Already running as installed app → hide everything
-    if (isStandalone) {
-      section.style.display = 'none';
-      return;
-    }
-
-    // Show the section
-    section.removeAttribute('hidden');
-    section.style.display = '';
-
-    if (isIOS && isSafari) {
-      showCard('ios');
-    } else if (isAndroid) {
-      showCard('android');
-    } else {
-      showCard('desktop');
-    }
-  }
-
-  function showCard(platform) {
-    var card = document.querySelector('[data-pwa-platform="' + platform + '"]');
-    if (card) { card.style.display = 'flex'; card.removeAttribute('hidden'); }
-    var btn = document.querySelector('[data-pwa-install="' + platform + '"]');
-    if (btn) { btn.removeAttribute('hidden'); btn.style.display = ''; }
-  }
-
-  function hideSection() {
+    deferredPrompt = null;
     var s = document.getElementById('pwa-install-section');
     if (s) s.style.display = 'none';
-  }
-
-  function showSuccess() {
     var fb = document.getElementById('pwa-install-success');
-    if (fb) {
-      fb.removeAttribute('hidden');
-      fb.style.display = 'flex';
-      setTimeout(function () { fb.style.display = 'none'; }, 5000);
+    if (fb) { fb.style.display = 'flex'; setTimeout(function(){ fb.style.display='none'; }, 6000); }
+  });
+
+  /* ── Public API (called by onclick in HTML) ───────────── */
+  window.WHAcademyPWA = {
+
+    triggerInstall: function (type) {
+      if (type === 'ios' || isIOS || isIPadOS) {
+        showIOSModal();
+        return;
+      }
+
+      if (deferredPrompt) {
+        // Native install prompt available — use it
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then(function (r) {
+          console.log('[PWA] User choice:', r.outcome);
+          deferredPrompt = null;
+        });
+        return;
+      }
+
+      // Prompt not available yet — guide user manually
+      var isDesktop = !isAndroid && !isIOS && !isIPadOS;
+      if (isAndroid) {
+        showAndroidGuide();
+      } else if (isDesktop && (isChrome || isEdge)) {
+        showDesktopGuide();
+      } else {
+        showGenericGuide();
+      }
+    },
+
+    dismissModal: function () {
+      var m = document.getElementById('pwa-guide-modal');
+      if (m) { m.classList.remove('pwa-modal--open'); setTimeout(function(){ m.remove(); }, 350); }
     }
+  };
+
+  /* ── Init on DOM ready ────────────────────────────────── */
+  function init() {
+    if (isStandalone) {
+      var s = document.getElementById('pwa-install-section');
+      if (s) s.style.display = 'none';
+      return;
+    }
+    // Section is always visible in HTML — just highlight the right card
+    var platform = (isIOS || isIPadOS) ? 'ios' : isAndroid ? 'android' : 'desktop';
+    var card = document.querySelector('[data-pwa-platform="' + platform + '"]');
+    if (card) card.classList.add('pwa-card--active');
   }
 
   if (document.readyState === 'loading') {
@@ -132,58 +104,135 @@
 
   /* ── iOS Modal ────────────────────────────────────────── */
   function showIOSModal() {
-    var modal = document.getElementById('pwa-ios-modal');
-    if (!modal) {
-      modal = buildIOSModal();
-      document.body.appendChild(modal);
-    }
-    modal.offsetHeight; // reflow
-    modal.classList.add('pwa-modal--visible');
+    openModal(
+      'Install on iPhone / iPad',
+      'No App Store needed. Takes 10 seconds!',
+      [
+        { icon: '⎋', text: 'Tap the <strong>Share</strong> button at the bottom of Safari' },
+        { icon: '⊕', text: 'Tap <strong>Add to Home Screen</strong>' },
+        { icon: '✓', text: 'Tap <strong>Add</strong> — done!' }
+      ],
+      null
+    );
   }
 
-  function buildIOSModal() {
+  /* ── Android Guide (when prompt not yet fired) ─────────── */
+  function showAndroidGuide() {
+    openModal(
+      'Install on Android',
+      'Make sure you are using Chrome browser, then:',
+      [
+        { icon: '⋮', text: 'Tap the <strong>3-dot menu</strong> (top right of Chrome)' },
+        { icon: '⊕', text: 'Tap <strong>Add to Home screen</strong> or <strong>Install app</strong>' },
+        { icon: '✓', text: 'Tap <strong>Install</strong> — done!' }
+      ],
+      null
+    );
+  }
+
+  /* ── Desktop Guide ────────────────────────────────────── */
+  function showDesktopGuide() {
+    openModal(
+      'Install on Desktop',
+      'Look for the install icon in your address bar:',
+      [
+        { icon: '🌐', text: 'In Chrome/Edge, look for the <strong>⊕ install icon</strong> at the right of the address bar' },
+        { icon: '🖱', text: 'Click it and select <strong>Install</strong>' },
+        { icon: '✓', text: 'The app will open in its own window!' }
+      ],
+      'If you do not see the icon, try refreshing the page once.'
+    );
+  }
+
+  function showGenericGuide() {
+    openModal(
+      'Install WH Academy',
+      'Use Chrome or Edge browser to install this app:',
+      [
+        { icon: '🌐', text: 'Open this page in <strong>Chrome</strong> or <strong>Edge</strong>' },
+        { icon: '⊕', text: 'Look for <strong>Install app</strong> in the browser menu' },
+        { icon: '✓', text: 'Tap Install and enjoy!' }
+      ],
+      null
+    );
+  }
+
+  /* ── Modal Builder ────────────────────────────────────── */
+  function openModal(title, subtitle, steps, note) {
+    // Remove any existing modal
+    var old = document.getElementById('pwa-guide-modal');
+    if (old) old.remove();
+
+    injectModalStyles();
+
+    var stepsHTML = steps.map(function (s) {
+      return '<li><span class="pgm-step-icon">' + s.icon + '</span><span>' + s.text + '</span></li>';
+    }).join('');
+
+    var noteHTML = note ? '<p class="pgm-note">' + note + '</p>' : '';
+
     var modal = document.createElement('div');
-    modal.id = 'pwa-ios-modal';
+    modal.id = 'pwa-guide-modal';
     modal.setAttribute('role', 'dialog');
     modal.setAttribute('aria-modal', 'true');
     modal.innerHTML =
-      '<div class="pwa-modal__backdrop" onclick="WHAcademyPWA.dismissIOSModal()"></div>' +
-      '<div class="pwa-modal__box">' +
-        '<button class="pwa-modal__close" onclick="WHAcademyPWA.dismissIOSModal()" aria-label="Close">&#x2715;</button>' +
-        '<div class="pwa-modal__icon"><img src="icons/icon-192x192.png" alt="WH Academy" width="80" height="80"></div>' +
-        '<h2 class="pwa-modal__title">Install WH Academy on iPhone</h2>' +
-        '<p class="pwa-modal__subtitle">No App Store needed! Add directly to your Home Screen.</p>' +
-        '<ol class="pwa-modal__steps">' +
-          '<li><span class="pwa-step-num">1</span><span>Tap the <strong>Share</strong> button <span style="font-size:1.2em">⎋</span> at the bottom of Safari</span></li>' +
-          '<li><span class="pwa-step-num">2</span><span>Scroll and tap <strong>Add to Home Screen</strong> <span style="font-size:1.1em">＋</span></span></li>' +
-          '<li><span class="pwa-step-num">3</span><span>Tap <strong>Add</strong> in the top-right corner</span></li>' +
-        '</ol>' +
-        '<button class="pwa-modal__done" onclick="WHAcademyPWA.dismissIOSModal()">Got it!</button>' +
+      '<div class="pgm-backdrop" onclick="WHAcademyPWA.dismissModal()"></div>' +
+      '<div class="pgm-box">' +
+        '<button class="pgm-close" onclick="WHAcademyPWA.dismissModal()" aria-label="Close">✕</button>' +
+        '<img class="pgm-logo" src="icons/icon-192x192.png" alt="WH Academy">' +
+        '<h2 class="pgm-title">' + title + '</h2>' +
+        '<p class="pgm-subtitle">' + subtitle + '</p>' +
+        '<ol class="pgm-steps">' + stepsHTML + '</ol>' +
+        noteHTML +
+        '<button class="pgm-done" onclick="WHAcademyPWA.dismissModal()">Got it!</button>' +
       '</div>';
 
-    if (!document.getElementById('pwa-modal-styles')) {
-      var s = document.createElement('style');
-      s.id = 'pwa-modal-styles';
-      s.textContent = [
-        '#pwa-ios-modal{position:fixed;inset:0;z-index:99999;display:flex;align-items:flex-end;justify-content:center;opacity:0;pointer-events:none;transition:opacity .3s}',
-        '#pwa-ios-modal.pwa-modal--visible{opacity:1;pointer-events:auto}',
-        '.pwa-modal__backdrop{position:absolute;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px)}',
-        '.pwa-modal__box{position:relative;z-index:1;background:#fff;border-radius:28px 28px 0 0;padding:36px 28px 44px;width:100%;max-width:460px;box-shadow:0 -8px 40px rgba(0,0,0,.2);transform:translateY(50px);transition:transform .35s cubic-bezier(.34,1.56,.64,1);font-family:system-ui,sans-serif}',
-        '#pwa-ios-modal.pwa-modal--visible .pwa-modal__box{transform:translateY(0)}',
-        '.pwa-modal__close{position:absolute;top:16px;right:18px;background:#f1f1f1;border:none;border-radius:50%;width:32px;height:32px;font-size:15px;cursor:pointer;color:#555;display:flex;align-items:center;justify-content:center}',
-        '.pwa-modal__icon{display:flex;justify-content:center;margin-bottom:18px}',
-        '.pwa-modal__icon img{border-radius:20px;box-shadow:0 4px 20px rgba(0,0,0,.25)}',
-        '.pwa-modal__title{font-size:1.25rem;font-weight:800;color:#1e1b4b;text-align:center;margin:0 0 8px}',
-        '.pwa-modal__subtitle{font-size:.9rem;color:#6b7280;text-align:center;margin:0 0 24px}',
-        '.pwa-modal__steps{list-style:none;padding:0;margin:0 0 28px;display:flex;flex-direction:column;gap:12px}',
-        '.pwa-modal__steps li{display:flex;align-items:center;gap:14px;background:#f9f7ff;border-radius:14px;padding:14px 16px;font-size:.9rem;color:#374151}',
-        '.pwa-step-num{background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:.85rem;font-weight:700;flex-shrink:0}',
-        '.pwa-modal__done{width:100%;background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;border:none;border-radius:14px;padding:15px;font-size:1rem;font-weight:700;cursor:pointer;transition:opacity .2s}',
-        '.pwa-modal__done:hover{opacity:.88}'
-      ].join('');
-      document.head.appendChild(s);
-    }
-    return modal;
+    document.body.appendChild(modal);
+    // Force reflow then animate in
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        modal.classList.add('pwa-modal--open');
+      });
+    });
+  }
+
+  function injectModalStyles() {
+    if (document.getElementById('pwa-modal-css')) return;
+    var s = document.createElement('style');
+    s.id = 'pwa-modal-css';
+    s.textContent = [
+      '#pwa-guide-modal{position:fixed;inset:0;z-index:99999;display:flex;align-items:flex-end;',
+        'justify-content:center;opacity:0;pointer-events:none;',
+        'transition:opacity .28s ease;}',
+      '#pwa-guide-modal.pwa-modal--open{opacity:1;pointer-events:auto;}',
+      '.pgm-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(5px);}',
+      '.pgm-box{position:relative;z-index:1;width:100%;max-width:460px;',
+        'background:#fff;border-radius:28px 28px 0 0;padding:36px 26px 48px;',
+        'box-shadow:0 -6px 40px rgba(0,0,0,.28);',
+        'transform:translateY(60px);transition:transform .32s cubic-bezier(.22,1,.36,1);',
+        'font-family:system-ui,-apple-system,sans-serif;}',
+      '#pwa-guide-modal.pwa-modal--open .pgm-box{transform:translateY(0);}',
+      '.pgm-close{position:absolute;top:14px;right:16px;width:30px;height:30px;',
+        'border:none;border-radius:50%;background:#f0f0f0;cursor:pointer;',
+        'font-size:14px;color:#555;display:flex;align-items:center;justify-content:center;}',
+      '.pgm-logo{display:block;width:72px;height:72px;border-radius:18px;',
+        'box-shadow:0 4px 18px rgba(0,0,0,.22);margin:0 auto 16px;}',
+      '.pgm-title{font-size:1.2rem;font-weight:800;color:#1a1a2e;text-align:center;margin:0 0 6px;}',
+      '.pgm-subtitle{font-size:.88rem;color:#555;text-align:center;margin:0 0 22px;line-height:1.5;}',
+      '.pgm-steps{list-style:none;padding:0;margin:0 0 22px;display:flex;flex-direction:column;gap:10px;}',
+      '.pgm-steps li{display:flex;align-items:center;gap:14px;',
+        'background:#f7f5ff;border-radius:14px;padding:13px 15px;',
+        'font-size:.88rem;color:#333;line-height:1.4;}',
+      '.pgm-step-icon{font-size:1.3rem;width:32px;text-align:center;flex-shrink:0;',
+        'font-weight:700;color:#4f46e5;}',
+      '.pgm-note{font-size:.8rem;color:#888;text-align:center;margin:-10px 0 18px;font-style:italic;}',
+      '.pgm-done{width:100%;padding:14px;border:none;border-radius:14px;',
+        'background:linear-gradient(135deg,#b8860b,#d4af37);',
+        'color:#0a0820;font-size:.95rem;font-weight:800;cursor:pointer;',
+        'box-shadow:0 4px 14px rgba(212,175,55,.35);transition:opacity .2s;}',
+      '.pgm-done:hover{opacity:.88;}'
+    ].join('');
+    document.head.appendChild(s);
   }
 
 })();
