@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#4f46e5">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>You're Offline — W.H. Academy</title>
+  <link rel="icon" type="image/png" href="favicon.png" sizes="32x32">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --primary: #4f46e5;
+      --primary-light: #818cf8;
+      --bg: #f5f3ff;
+      --text: #1e1b4b;
+      --muted: #6b7280;
+      --card: #ffffff;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f0e2a;
+        --text: #e0e7ff;
+        --muted: #9ca3af;
+        --card: #1e1b4b;
+      }
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .card {
+      background: var(--card);
+      border-radius: 28px;
+      padding: 48px 36px;
+      max-width: 420px;
+      width: 100%;
+      box-shadow: 0 8px 40px rgba(79,70,229,0.12);
+    }
+
+    .icon-wrapper {
+      width: 96px; height: 96px;
+      background: linear-gradient(135deg, #ede9fe, #c7d2fe);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 28px;
+      font-size: 3rem;
+    }
+
+    .academy-logo {
+      display: inline-block;
+      width: 64px; height: 64px;
+      background: linear-gradient(135deg, var(--primary), #7c3aed);
+      border-radius: 16px;
+      color: #fff;
+      font-size: 1.3rem;
+      font-weight: 900;
+      letter-spacing: -1px;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 24px;
+    }
+
+    h1 {
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: var(--text);
+      margin-bottom: 12px;
+    }
+
+    p {
+      font-size: 0.95rem;
+      color: var(--muted);
+      line-height: 1.6;
+      margin-bottom: 8px;
+    }
+
+    .tips {
+      background: #f5f3ff;
+      border-radius: 16px;
+      padding: 20px;
+      margin: 28px 0;
+      text-align: left;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .tips { background: #2d2a6a; }
+    }
+
+    .tips-title {
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--primary-light);
+      margin-bottom: 12px;
+    }
+
+    .tips ul {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .tips li {
+      font-size: 0.88rem;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .tips li::before {
+      content: '✓';
+      color: var(--primary);
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 14px 24px;
+      border-radius: 14px;
+      border: none;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+      transition: opacity 0.2s, transform 0.15s;
+    }
+    .btn:hover { opacity: 0.88; transform: translateY(-1px); }
+    .btn:active { transform: translateY(0); }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary), #7c3aed);
+      color: #fff;
+    }
+
+    .btn-secondary {
+      background: #ede9fe;
+      color: var(--primary);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .btn-secondary { background: #2d2a6a; }
+    }
+
+    .connection-status {
+      margin-top: 24px;
+      font-size: 0.8rem;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .status-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #ef4444;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    .status-dot.online { background: #22c55e; animation: none; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="academy-logo">WH</div>
+
+    <h1>You're Offline</h1>
+    <p>It looks like your internet connection is unavailable right now.</p>
+    <p>Don't worry — pages you've already visited are still available.</p>
+
+    <div class="tips">
+      <div class="tips-title">Available Offline</div>
+      <ul>
+        <li>Pages you've visited before</li>
+        <li>Cached notes and chapters</li>
+        <li>Downloaded images</li>
+      </ul>
+    </div>
+
+    <div class="btn-group">
+      <button class="btn btn-primary" onclick="window.location.reload()">
+        🔄 Try Again
+      </button>
+      <a class="btn btn-secondary" href="./">
+        🏠 Go to Home
+      </a>
+    </div>
+
+    <div class="connection-status">
+      <div class="status-dot" id="status-dot"></div>
+      <span id="status-text">Offline</span>
+    </div>
+  </div>
+
+  <script>
+    function updateStatus() {
+      const dot  = document.getElementById('status-dot');
+      const text = document.getElementById('status-text');
+      if (navigator.onLine) {
+        dot.classList.add('online');
+        text.textContent = 'Connected — click Try Again';
+      } else {
+        dot.classList.remove('online');
+        text.textContent = 'Offline';
+      }
+    }
+
+    window.addEventListener('online',  updateStatus);
+    window.addEventListener('offline', updateStatus);
+    updateStatus();
+
+    // Auto-reload when connection returns
+    window.addEventListener('online', () => {
+      setTimeout(() => window.location.reload(), 800);
+    });
+  </script>
+</body>
+</html>
